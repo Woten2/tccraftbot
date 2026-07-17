@@ -46,9 +46,19 @@ bot = CustomBot(
     case_insensitive=True
 )
 
-# === SUNUCU BİLGİLERİ (GİZLİ) ===
-SERVER_IP = "104.239.83.40"          # Sayısal IP (sorgulama buradan yapılır)
+# === GİZLİ SUNUCU BİLGİLERİ (Kodda, gözükmez) ===
+BASE_IP = "104.239.83.40"          # Gizli - sadece kodda
 SERVER_DOMAIN = "oyna.tccraft.com.tr"  # Gösterilecek domain
+
+# Portlar gizli - sadece kodda (25566-25571)
+SERVERS = {
+    "Lobi": 25566,
+    "Towny": 25567,
+    "SMP": 25568,
+    "SkyBlock": 25569,
+    "BoxPVP": 25570,
+    "TrapPVP": 25571
+}
 
 @bot.event
 async def on_ready():
@@ -66,51 +76,59 @@ async def on_message(message):
             return
     await bot.process_commands(message)
 
-# ---------- tc!sunucu ----------
+# ---------- tc!sunucu (TÜM SUNUCULAR - PORTLAR GİZLİ) ----------
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
-    try:
-        # Sayısal IP'den sorgula (gizli)
-        server = mcstatus.JavaServer(SERVER_IP, timeout=5)
-        status = server.status()
-        query = server.query()
-        
-        players = query.players.names if query.players.names else ["Oyuncu yok"]
-        player_list = "\n".join(players[:20])
-        if len(players) > 20:
-            player_list += f"\n... ve {len(players)-20} oyuncu daha"
-        
-        embed = discord.Embed(
-            title="🎮 TCCRAFT Sunucu Durumu",
-            color=discord.Color.green() if status.players.online > 0 else discord.Color.red(),
-            timestamp=ctx.message.created_at
-        )
-        # Domain göster (sayısal IP gizli)
-        embed.add_field(name="📡 Sunucu", value=f"`{SERVER_DOMAIN}`", inline=False)
-        embed.add_field(name="📌 Sürüm", value=f"`{status.version.name}`", inline=True)
-        embed.add_field(name="👥 Oyuncu", value=f"**{status.players.online}** / {status.players.max}", inline=True)
-        embed.add_field(name="🔄 Gecikme", value=f"`{status.latency*1000:.1f} ms`", inline=True)
-        embed.add_field(name="📝 MOTD", value=f"```{status.motd}```", inline=False)
-        embed.add_field(name="👤 Çevrimiçi Oyuncular", value=f"```{player_list}```", inline=False)
-        embed.set_footer(text="TCCRAFT • tc!yardım ile tüm komutları gör")
-        
-        await ctx.author.send(embed=embed)
-        if ctx.guild:
-            await ctx.message.delete()
-            await ctx.send("✅ Bilgiler DM olarak gönderildi!", delete_after=5)
-    except Exception as e:
-        error_embed = discord.Embed(
-            title="❌ Hata!",
-            description=f"Sunucuya ulaşılamıyor veya bir hata oluştu.\n```{str(e)}```",
-            color=discord.Color.red()
-        )
-        await ctx.author.send(embed=error_embed)
-        if ctx.guild:
-            await ctx.message.delete()
-            await ctx.send("❌ Hata oluştu, DM'ni kontrol et!", delete_after=5)
+    
+    embed = discord.Embed(
+        title="🎮 TCCRAFT Sunucular",
+        description=f"**{SERVER_DOMAIN}**",
+        color=discord.Color.blue(),
+        timestamp=ctx.message.created_at
+    )
+    
+    online_count = 0
+    total_players = 0
+    
+    for server_name, port in SERVERS.items():
+        try:
+            server = mcstatus.JavaServer(f"{BASE_IP}:{port}", timeout=3)
+            status = server.status()
+            
+            online_count += 1
+            total_players += status.players.online
+            
+            if status.players.online > 0:
+                status_emoji = "🟢"
+            else:
+                status_emoji = "🟡"
+            
+            # Gösterimde port yok, sadece sunucu adı ve oyuncu bilgisi
+            embed.add_field(
+                name=f"{status_emoji} {server_name}",
+                value=f"👥 `{status.players.online}` / {status.players.max}\n"
+                      f"📌 `{status.version.name}`\n"
+                      f"🔄 `{status.latency*1000:.0f}ms`",
+                inline=True
+            )
+        except:
+            embed.add_field(
+                name=f"🔴 {server_name}",
+                value="❌ **Kapalı**",
+                inline=True
+            )
+    
+    embed.set_footer(
+        text=f"✅ {online_count}/{len(SERVERS)} aktif • {total_players} oyuncu • tc!yardım"
+    )
+    
+    await ctx.author.send(embed=embed)
+    if ctx.guild:
+        await ctx.message.delete()
+        await ctx.send("✅ Sunucu bilgileri DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!yardım ----------
+# ---------- tc!yardım (PORTLAR GÖSTERMEZ) ----------
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
@@ -118,12 +136,19 @@ async def yardim(ctx):
         description="Tüm komutlar **DM** olarak gönderilir!",
         color=discord.Color.blue()
     )
-    embed.add_field(name="🎮 `tc!sunucu`", value="Sunucu durumunu gösterir.", inline=False)
+    embed.add_field(
+        name="🎮 `tc!sunucu`",
+        value=f"**{SERVER_DOMAIN}** üzerindeki tüm sunucuların durumunu gösterir.",
+        inline=False
+    )
+    embed.add_field(
+        name="👤 `tc!oyuncular`",
+        value="Tüm sunuculardaki çevrimiçi oyuncuları listeler.",
+        inline=False
+    )
     embed.add_field(name="❓ `tc!yardım`", value="Bu komut listesini gösterir.", inline=False)
     embed.add_field(name="🌐 `tc!ping`", value="Botun gecikmesini gösterir.", inline=False)
     embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
-    embed.add_field(name="👤 `tc!oyuncular`", value="Çevrimiçi oyuncuları listeler.", inline=False)
-    embed.add_field(name="📈 `tc!trafik`", value="Sunucu trafiğini gösterir.", inline=False)
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
@@ -132,6 +157,60 @@ async def yardim(ctx):
     if ctx.guild:
         await ctx.message.delete()
         await ctx.send("📨 Yardım menüsü DM olarak gönderildi!", delete_after=5)
+
+# ---------- tc!oyuncular (TÜM SUNUCULAR - PORT GÖSTERMEZ) ----------
+@bot.command(name='oyuncular')
+async def oyuncular(ctx):
+    await ctx.typing()
+    
+    embed = discord.Embed(
+        title="👥 Tüm Sunuculardaki Oyuncular",
+        color=discord.Color.green(),
+        timestamp=ctx.message.created_at
+    )
+    
+    total_players = 0
+    has_players = False
+    
+    for server_name, port in SERVERS.items():
+        try:
+            server = mcstatus.JavaServer(f"{BASE_IP}:{port}", timeout=3)
+            query = server.query()
+            players = query.players.names if query.players.names else []
+            
+            if players:
+                has_players = True
+                total_players += len(players)
+                player_list = "\n".join([f"• {p}" for p in players[:15]])
+                if len(players) > 15:
+                    player_list += f"\n... ve {len(players)-15} oyuncu daha"
+                embed.add_field(
+                    name=f"🟢 {server_name} ({len(players)})",
+                    value=player_list,
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name=f"🟡 {server_name}",
+                    value="*Oyuncu yok*",
+                    inline=False
+                )
+        except:
+            embed.add_field(
+                name=f"🔴 {server_name}",
+                value="*Kapalı*",
+                inline=False
+            )
+    
+    if not has_players:
+        embed.description = "📭 **Hiçbir sunucuda oyuncu yok!**"
+    
+    embed.set_footer(text=f"Toplam {total_players} oyuncu çevrimiçi")
+    
+    await ctx.author.send(embed=embed)
+    if ctx.guild:
+        await ctx.message.delete()
+        await ctx.send("✅ Oyuncu listesi DM olarak gönderildi!", delete_after=5)
 
 # ---------- tc!ping ----------
 @bot.command(name='ping')
@@ -158,66 +237,11 @@ async def istatistik(ctx):
     embed.add_field(name="📚 Sunucu Sayısı", value=len(bot.guilds), inline=True)
     embed.add_field(name="👥 Kullanıcı Sayısı", value=len(bot.users), inline=True)
     embed.add_field(name="⏰ Çalışma Süresi", value="Bot aktif ✅", inline=True)
-    embed.add_field(name="🔗 Bağlantı", value="[TCCRAFT](https://tccraft.com.tr)", inline=True)
+    embed.add_field(name="🔗 Bağlantı", value=f"[{SERVER_DOMAIN}](https://{SERVER_DOMAIN})", inline=True)
     
     await ctx.author.send(embed=embed)
     if ctx.guild:
         await ctx.message.delete()
-
-# ---------- tc!oyuncular ----------
-@bot.command(name='oyuncular')
-async def oyuncular(ctx):
-    await ctx.typing()
-    try:
-        # Sayısal IP'den sorgula (gizli)
-        server = mcstatus.JavaServer(SERVER_IP, timeout=5)
-        query = server.query()
-        players = query.players.names if query.players.names else ["Oyuncu yok"]
-        
-        if players == ["Oyuncu yok"]:
-            await ctx.author.send("📭 **Sunucuda şu anda oyuncu yok!**")
-        else:
-            player_list = "\n".join([f"• {p}" for p in players])
-            embed = discord.Embed(
-                title=f"👥 Çevrimiçi Oyuncular ({len(players)})",
-                description=player_list,
-                color=discord.Color.green()
-            )
-            await ctx.author.send(embed=embed)
-        
-        if ctx.guild:
-            await ctx.message.delete()
-            await ctx.send("✅ Oyuncu listesi DM olarak gönderildi!", delete_after=5)
-    except Exception as e:
-        await ctx.author.send(f"❌ Hata: {e}")
-        if ctx.guild:
-            await ctx.message.delete()
-
-# ---------- tc!trafik ----------
-@bot.command(name='trafik')
-async def trafik(ctx):
-    try:
-        # Sayısal IP'den sorgula (gizli)
-        server = mcstatus.JavaServer(SERVER_IP, timeout=5)
-        status = server.status()
-        
-        embed = discord.Embed(
-            title="📈 Sunucu Trafik Bilgisi",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="👥 Şu Anki Oyuncu", value=f"{status.players.online}/{status.players.max}", inline=True)
-        embed.add_field(name="📊 Maksimum Oyuncu", value=status.players.max, inline=True)
-        embed.add_field(name="📌 Sürüm", value=status.version.name, inline=True)
-        embed.set_footer(text="TCCRAFT • Trafik bilgileri")
-        
-        await ctx.author.send(embed=embed)
-        if ctx.guild:
-            await ctx.message.delete()
-            await ctx.send("✅ Trafik bilgileri DM olarak gönderildi!", delete_after=5)
-    except Exception as e:
-        await ctx.author.send(f"❌ Hata: {e}")
-        if ctx.guild:
-            await ctx.message.delete()
 
 # ---------- tc!zaman ----------
 @bot.command(name='zaman')
@@ -249,7 +273,7 @@ async def botbilgi(ctx):
     embed.add_field(name="👥 Toplam Kullanıcı", value=len(bot.users), inline=True)
     embed.add_field(name="⚙️ Gecikme", value=f"{round(bot.latency * 1000)}ms", inline=True)
     embed.add_field(name="📌 Prefix", value="`tc!` (büyük/küçük harf duyarsız)", inline=False)
-    embed.add_field(name="🔗 Bağlantı", value="[TCCRAFT](https://tccraft.com.tr)", inline=False)
+    embed.add_field(name="🔗 Bağlantı", value=f"[{SERVER_DOMAIN}](https://{SERVER_DOMAIN})", inline=False)
     embed.set_footer(text="TCCRAFT • tc!yardım ile tüm komutları gör")
     
     await ctx.author.send(embed=embed)
