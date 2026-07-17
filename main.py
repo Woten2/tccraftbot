@@ -46,6 +46,10 @@ bot = CustomBot(
     case_insensitive=True
 )
 
+# === SUNUCU BİLGİLERİ (GİZLİ) ===
+SERVER_IP = "104.239.83.40"          # Sayısal IP (sorgulama buradan yapılır)
+SERVER_DOMAIN = "oyna.tccraft.com.tr"  # Gösterilecek domain
+
 @bot.event
 async def on_ready():
     print(f'✅ {bot.user} olarak giriş yapıldı!')
@@ -62,12 +66,13 @@ async def on_message(message):
             return
     await bot.process_commands(message)
 
-# ---------- tc!sunucu (DM) ----------
+# ---------- tc!sunucu ----------
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
     try:
-        server = mcstatus.JavaServer("oyna.tccraft.com.tr", timeout=5)
+        # Sayısal IP'den sorgula (gizli)
+        server = mcstatus.JavaServer(SERVER_IP, timeout=5)
         status = server.status()
         query = server.query()
         
@@ -81,7 +86,8 @@ async def sunucu_durumu(ctx):
             color=discord.Color.green() if status.players.online > 0 else discord.Color.red(),
             timestamp=ctx.message.created_at
         )
-        embed.add_field(name="📡 Sunucu", value="`oyna.tccraft.com.tr`", inline=False)
+        # Domain göster (sayısal IP gizli)
+        embed.add_field(name="📡 Sunucu", value=f"`{SERVER_DOMAIN}`", inline=False)
         embed.add_field(name="📌 Sürüm", value=f"`{status.version.name}`", inline=True)
         embed.add_field(name="👥 Oyuncu", value=f"**{status.players.online}** / {status.players.max}", inline=True)
         embed.add_field(name="🔄 Gecikme", value=f"`{status.latency*1000:.1f} ms`", inline=True)
@@ -89,7 +95,6 @@ async def sunucu_durumu(ctx):
         embed.add_field(name="👤 Çevrimiçi Oyuncular", value=f"```{player_list}```", inline=False)
         embed.set_footer(text="TCCRAFT • tc!yardım ile tüm komutları gör")
         
-        # DM olarak gönder
         await ctx.author.send(embed=embed)
         if ctx.guild:
             await ctx.message.delete()
@@ -105,7 +110,7 @@ async def sunucu_durumu(ctx):
             await ctx.message.delete()
             await ctx.send("❌ Hata oluştu, DM'ni kontrol et!", delete_after=5)
 
-# ---------- tc!yardım (DM) ----------
+# ---------- tc!yardım ----------
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
@@ -128,7 +133,7 @@ async def yardim(ctx):
         await ctx.message.delete()
         await ctx.send("📨 Yardım menüsü DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!ping (DM) ----------
+# ---------- tc!ping ----------
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -141,7 +146,7 @@ async def ping(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# ---------- tc!istatistik (DM) ----------
+# ---------- tc!istatistik ----------
 @bot.command(name='istatistik')
 async def istatistik(ctx):
     embed = discord.Embed(
@@ -159,12 +164,13 @@ async def istatistik(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# ---------- tc!oyuncular (DM) ----------
+# ---------- tc!oyuncular ----------
 @bot.command(name='oyuncular')
 async def oyuncular(ctx):
     await ctx.typing()
     try:
-        server = mcstatus.JavaServer("oyna.tccraft.com.tr", timeout=5)
+        # Sayısal IP'den sorgula (gizli)
+        server = mcstatus.JavaServer(SERVER_IP, timeout=5)
         query = server.query()
         players = query.players.names if query.players.names else ["Oyuncu yok"]
         
@@ -187,11 +193,12 @@ async def oyuncular(ctx):
         if ctx.guild:
             await ctx.message.delete()
 
-# ---------- tc!trafik (DM) ----------
+# ---------- tc!trafik ----------
 @bot.command(name='trafik')
 async def trafik(ctx):
     try:
-        server = mcstatus.JavaServer("oyna.tccraft.com.tr", timeout=5)
+        # Sayısal IP'den sorgula (gizli)
+        server = mcstatus.JavaServer(SERVER_IP, timeout=5)
         status = server.status()
         
         embed = discord.Embed(
@@ -212,7 +219,7 @@ async def trafik(ctx):
         if ctx.guild:
             await ctx.message.delete()
 
-# ---------- tc!zaman (DM) ----------
+# ---------- tc!zaman ----------
 @bot.command(name='zaman')
 async def zaman(ctx):
     now = datetime.datetime.now()
@@ -228,7 +235,7 @@ async def zaman(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# ---------- tc!botbilgi (DM) ----------
+# ---------- tc!botbilgi ----------
 @bot.command(name='botbilgi')
 async def botbilgi(ctx):
     embed = discord.Embed(
