@@ -38,10 +38,22 @@ bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None, cas
 ROL_ID = 1527706174424612934  # Sunucu Kesintileri Rolü
 
 # ============================================
-# SLASH KOMUT (ROL VER / ROL ÇIKAR - AYRI BUTONLAR)
+# SLASH KOMUT (SADECE YETKİLİLER)
 # ============================================
-@bot.tree.command(name="rolverme", description="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!")
+@bot.tree.command(
+    name="rolverme",
+    description="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!",
+    default_permission=False  # <--- HERKESE KAPALI
+)
 async def rolverme(interaction: discord.Interaction):
+    # Yetki kontrolü
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message(
+            "❌ **Bu komutu kullanmak için yetkin yok!**\nSadece yöneticiler kullanabilir.",
+            ephemeral=True
+        )
+        return
+    
     role = interaction.guild.get_role(ROL_ID)
     
     if role is None:
@@ -251,7 +263,7 @@ async def yardim(ctx):
     embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
-    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!", inline=False)
+    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar! **(Sadece Yetkililer)**", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.author.send(embed=embed)
