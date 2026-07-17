@@ -13,7 +13,7 @@ if not BOT_TOKEN:
     print("📌 Render'a DISCORD_TOKEN eklemeyi unutma!")
     exit(1)
 
-# === FLASK WEB SUNUCU (Wake-up için) ===
+# === FLASK WEB SUNUCU ===
 app = Flask('')
 
 @app.route('/')
@@ -21,7 +21,7 @@ def wake_up():
     return "Bot aktif ve çalışıyor! ✅"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
 
 def keep_alive():
     t = Thread(target=run_flask)
@@ -29,8 +29,7 @@ def keep_alive():
     t.start()
 
 # === DISCORD BOT ===
-intents = discord.Intents.default()
-intents.message_content = True
+intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None)
 
 @bot.event
@@ -38,7 +37,7 @@ async def on_ready():
     print(f'✅ {bot.user} olarak giriş yapıldı!')
     await bot.change_presence(activity=discord.Game(name="tc!yardım"))
 
-# === 1. tc!sunucu - Sunucu bilgilerini göster ===
+# ---------- tc!sunucu ----------
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
@@ -80,7 +79,7 @@ async def sunucu_durumu(ctx):
             await ctx.message.delete()
             await ctx.send("❌ Hata oluştu, özel mesajını kontrol et!", delete_after=5)
 
-# === 2. tc!yardım - Tüm komutları göster ===
+# ---------- tc!yardım ----------
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
@@ -88,26 +87,10 @@ async def yardim(ctx):
         description="Tüm komutlar **özel mesaj** olarak gönderilir!",
         color=discord.Color.blue()
     )
-    embed.add_field(
-        name="🎮 `tc!sunucu`",
-        value="Sunucu durumunu, oyuncu sayısını, sürümü ve çevrimiçi oyuncuları gösterir.",
-        inline=False
-    )
-    embed.add_field(
-        name="❓ `tc!yardım`",
-        value="Bu komut listesini gösterir.",
-        inline=False
-    )
-    embed.add_field(
-        name="🌐 `tc!ping`",
-        value="Botun gecikmesini gösterir.",
-        inline=False
-    )
-    embed.add_field(
-        name="📊 `tc!istatistik`",
-        value="Bot istatistiklerini gösterir.",
-        inline=False
-    )
+    embed.add_field(name="🎮 `tc!sunucu`", value="Sunucu durumunu gösterir.", inline=False)
+    embed.add_field(name="❓ `tc!yardım`", value="Bu komut listesini gösterir.", inline=False)
+    embed.add_field(name="🌐 `tc!ping`", value="Botun gecikmesini gösterir.", inline=False)
+    embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.author.send(embed=embed)
@@ -115,7 +98,7 @@ async def yardim(ctx):
         await ctx.message.delete()
         await ctx.send("📨 Yardım menüsü özel mesaj olarak gönderildi!", delete_after=5)
 
-# === 3. tc!ping - Bot gecikmesi ===
+# ---------- tc!ping ----------
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -128,7 +111,7 @@ async def ping(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# === 4. tc!istatistik - Bot istatistikleri ===
+# ---------- tc!istatistik ----------
 @bot.command(name='istatistik')
 async def istatistik(ctx):
     embed = discord.Embed(
@@ -146,6 +129,6 @@ async def istatistik(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# === BOTU BAŞLAT ===
+# === BAŞLAT ===
 keep_alive()
 bot.run(BOT_TOKEN)
