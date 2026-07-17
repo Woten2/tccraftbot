@@ -1,12 +1,17 @@
+import os
 import discord
 from discord.ext import commands
 import mcstatus
-import asyncio
 from flask import Flask
 from threading import Thread
 
-# === BOT TOKEN (DOĞRUDAN KODDA) ===
-BOT_TOKEN = "MTUxMTQ1NzU1NTcyNDExMTg5Mw.GrgII3.3aegfwd7vzyiSWoKjIxKWWmtwsOYkFP_uEEmxs"  # <--- BURAYA TOKEN'INI YAPIŞTIR
+# === TOKEN'ı ENVIRONMENT VARIABLE'DAN AL ===
+BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
+
+if not BOT_TOKEN:
+    print("❌ DISCORD_TOKEN environment variable'ı bulunamadı!")
+    print("📌 Render'a DISCORD_TOKEN eklemeyi unutma!")
+    exit(1)
 
 # === FLASK WEB SUNUCU (Wake-up için) ===
 app = Flask('')
@@ -28,14 +33,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None)
 
-# === KOMUTLAR ===
-
 @bot.event
 async def on_ready():
     print(f'✅ {bot.user} olarak giriş yapıldı!')
     await bot.change_presence(activity=discord.Game(name="tc!yardım"))
 
-# 1. tc!sunucu - Sunucu bilgilerini göster
+# === 1. tc!sunucu - Sunucu bilgilerini göster ===
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
@@ -44,7 +47,6 @@ async def sunucu_durumu(ctx):
         status = server.status()
         query = server.query()
         
-        # Oyuncu listesini düzenle
         players = query.players.names if query.players.names else ["Oyuncu yok"]
         player_list = "\n".join(players[:20])
         if len(players) > 20:
@@ -78,7 +80,7 @@ async def sunucu_durumu(ctx):
             await ctx.message.delete()
             await ctx.send("❌ Hata oluştu, özel mesajını kontrol et!", delete_after=5)
 
-# 2. tc!yardım - Tüm komutları göster (Özel mesaj)
+# === 2. tc!yardım - Tüm komutları göster ===
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
@@ -113,7 +115,7 @@ async def yardim(ctx):
         await ctx.message.delete()
         await ctx.send("📨 Yardım menüsü özel mesaj olarak gönderildi!", delete_after=5)
 
-# 3. tc!ping - Bot gecikmesi
+# === 3. tc!ping - Bot gecikmesi ===
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -126,7 +128,7 @@ async def ping(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# 4. tc!istatistik - Bot istatistikleri
+# === 4. tc!istatistik - Bot istatistikleri ===
 @bot.command(name='istatistik')
 async def istatistik(ctx):
     embed = discord.Embed(
@@ -144,10 +146,6 @@ async def istatistik(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# === RENDER UYUMLU WAKE-UP KODU ===
-# Flask sunucusunu arka planda başlat
-keep_alive()
-
 # === BOTU BAŞLAT ===
-if __name__ == "__main__":
-    bot.run(BOT_TOKEN)
+keep_alive()
+bot.run(BOT_TOKEN)
