@@ -1,6 +1,7 @@
 import os
 import discord
 from discord.ext import commands
+from discord import app_commands  # <--- EKLENDI
 import mcstatus
 from flask import Flask
 from threading import Thread
@@ -38,22 +39,14 @@ bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None, cas
 ROL_ID = 1527706174424612934  # Sunucu Kesintileri Rolü
 
 # ============================================
-# SLASH KOMUT (SADECE YETKİLİLER)
+# SLASH KOMUT (SADECE YETKİLİLER - DÜZELTİLDİ)
 # ============================================
 @bot.tree.command(
     name="rolverme",
-    description="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!",
-    default_permission=False  # <--- HERKESE KAPALI
+    description="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!"
 )
+@app_commands.default_permissions(administrator=True)  # <--- YENİ YÖNTEM
 async def rolverme(interaction: discord.Interaction):
-    # Yetki kontrolü
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message(
-            "❌ **Bu komutu kullanmak için yetkin yok!**\nSadece yöneticiler kullanabilir.",
-            ephemeral=True
-        )
-        return
-    
     role = interaction.guild.get_role(ROL_ID)
     
     if role is None:
