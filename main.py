@@ -5,6 +5,7 @@ import mcstatus
 from flask import Flask
 from threading import Thread
 import datetime
+import asyncio
 
 # === TOKEN ===
 BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
@@ -28,38 +29,45 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# === BOT (CASE INSENSITIVE - KESİN ÇÖZÜM) ===
+# === BOT (CASE INSENSITIVE - KESİN) ===
 intents = discord.Intents.all()
 
-# 1. YÖNTEM: Bot oluştururken case_insensitive=True
-bot = commands.Bot(
+class CustomBot(commands.Bot):
+    async def get_prefix(self, message):
+        # Prefix'leri kontrol et (büyük/küçük harf duyarsız)
+        prefixes = ['tc!', 'TC!', 'Tc!', 'tC!']
+        for prefix in prefixes:
+            if message.content.startswith(prefix):
+                return prefix
+        return 'tc!'
+
+bot = CustomBot(
     command_prefix='tc!',
     intents=intents,
     help_command=None,
     case_insensitive=True
 )
 
-# 2. YÖNTEM: Ekstra olarak on_message ile prefix kontrolü (YEDEK)
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-    
-    # Prefix kontrolü (büyük/küçük harf duyarsız)
-    prefix = 'tc!'
-    content = message.content.lower()
-    
-    if content.startswith(prefix):
-        # Komutu işle
-        await bot.process_commands(message)
-    else:
-        # Diğer mesajları işleme
-        await bot.process_commands(message)
+# === KOMUTLAR ===
 
 @bot.event
 async def on_ready():
     print(f'✅ {bot.user} olarak giriş yapıldı!')
     await bot.change_presence(activity=discord.Game(name="tc!yardım"))
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+    
+    # Prefix kontrolü
+    prefixes = ['tc!', 'TC!', 'Tc!', 'tC!']
+    for prefix in prefixes:
+        if message.content.startswith(prefix):
+            await bot.process_commands(message)
+            return
+    
+    await bot.process_commands(message)
 
 # ---------- tc!sunucu ----------
 @bot.command(name='sunucu')
@@ -88,6 +96,7 @@ async def sunucu_durumu(ctx):
         embed.add_field(name="👤 Çevrimiçi Oyuncular", value=f"```{player_list}```", inline=False)
         embed.set_footer(text="TCCRAFT • tc!yardım ile tüm komutları gör")
         
+        # EPHEMERAL - Sadece komutu yazan kişi görür
         await ctx.send(embed=embed, ephemeral=True)
         await ctx.message.delete()
     except Exception as e:
@@ -99,7 +108,7 @@ async def sunucu_durumu(ctx):
 async def yardim(ctx):
     embed = discord.Embed(
         title="📚 TCCRAFT Bot Komutları",
-        description="Tüm komutlar **ephemeral (geçici)** olarak gönderilir!",
+        description="Tüm komutlar **sadece size özel** olarak gönderilir!",
         color=discord.Color.blue()
     )
     embed.add_field(name="🎮 `tc!sunucu`", value="Sunucu durumunu gösterir.", inline=False)
