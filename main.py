@@ -33,19 +33,41 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None, case_insensitive=True)
 
 # ============================================
-# ROL ID (BURAYA EKLENDİ)
+# ROL ID
 # ============================================
 ROL_ID = 1527706174424612934  # Sunucu Kesintileri Rolü
 
 # ============================================
-# SLASH KOMUT (ROL VERME)
+# SLASH KOMUT (ROL VER / ROL ÇIKAR)
 # ============================================
-@bot.tree.command(name="rolverme", description="Sunucu kesintilerinden haberdar olmak için rol al!")
+@bot.tree.command(name="rolverme", description="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!")
 async def rolverme(interaction: discord.Interaction):
+    role = interaction.guild.get_role(ROL_ID)
+    
+    if role is None:
+        await interaction.response.send_message(
+            "❌ **Rol bulunamadı!** Lütfen bot sahibine bildirin.",
+            ephemeral=True
+        )
+        return
+    
+    # Kullanıcının rolü var mı kontrol et
+    has_role = role in interaction.user.roles
+    
+    # Buton metni ve rengini belirle
+    if has_role:
+        button_label = "❌ Rolü Çıkar"
+        button_style = discord.ButtonStyle.red
+        custom_id = "rol_cikar"
+    else:
+        button_label = "✅ Rol Al"
+        button_style = discord.ButtonStyle.green
+        custom_id = "rol_al"
+    
     button = discord.ui.Button(
-        label="✅ Sunucu Kesintilerinden Haberdar Ol",
-        style=discord.ButtonStyle.green,
-        custom_id="rol_al_butonu"
+        label=button_label,
+        style=button_style,
+        custom_id=custom_id
     )
     
     view = discord.ui.View()
@@ -61,26 +83,32 @@ async def rolverme(interaction: discord.Interaction):
         value="• Anlık kesinti bildirimleri\n• Bakım duyuruları\n• Güncelleme haberleri\n• Özel etkinlik duyuruları",
         inline=False
     )
+    embed.add_field(
+        name="📌 Mevcut Durumun",
+        value=f"✅ **{role.name}** rolüne sahipsin!" if has_role else f"❌ **{role.name}** rolüne sahip değilsin!",
+        inline=False
+    )
     embed.set_footer(text="TCCRAFT • Her zaman bilgilen!")
     
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 # ============================================
-# BUTON ETKİLEŞİMİ
+# BUTON ETKİLEŞİMİ (ROL VER / ROL ÇIKAR)
 # ============================================
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
-        if interaction.data.get("custom_id") == "rol_al_butonu":
-            role = interaction.guild.get_role(ROL_ID)
-            
-            if role is None:
-                await interaction.response.send_message(
-                    "❌ **Rol bulunamadı!** Lütfen bot sahibine bildirin.",
-                    ephemeral=True
-                )
-                return
-            
+        role = interaction.guild.get_role(ROL_ID)
+        
+        if role is None:
+            await interaction.response.send_message(
+                "❌ **Rol bulunamadı!** Lütfen bot sahibine bildirin.",
+                ephemeral=True
+            )
+            return
+        
+        # --- ROL AL ---
+        if interaction.data.get("custom_id") == "rol_al":
             if role in interaction.user.roles:
                 await interaction.response.send_message(
                     f"❌ **Zaten `{role.name}` rolüne sahipsin!**",
@@ -97,6 +125,32 @@ async def on_interaction(interaction: discord.Interaction):
             except discord.Forbidden:
                 await interaction.response.send_message(
                     "❌ **Botun yetkisi yok!** Botun rol verme yetkisi olduğundan emin ol.",
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    f"❌ **Bir hata oluştu:** {e}",
+                    ephemeral=True
+                )
+        
+        # --- ROL ÇIKAR ---
+        elif interaction.data.get("custom_id") == "rol_cikar":
+            if role not in interaction.user.roles:
+                await interaction.response.send_message(
+                    f"❌ **Zaten `{role.name}` rolüne sahip değilsin!**",
+                    ephemeral=True
+                )
+                return
+            
+            try:
+                await interaction.user.remove_roles(role)
+                await interaction.response.send_message(
+                    f"✅ **Başarıyla `{role.name}` rolü çıkarıldı!**\nArtık bildirim almayacaksın.",
+                    ephemeral=True
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "❌ **Botun yetkisi yok!** Botun rol çıkarma yetkisi olduğundan emin ol.",
                     ephemeral=True
                 )
             except Exception as e:
@@ -207,7 +261,7 @@ async def yardim(ctx):
     embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
-    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al!", inline=False)
+    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.author.send(embed=embed)
