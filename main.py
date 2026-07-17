@@ -28,9 +28,16 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# === DISCORD BOT ===
+# === DISCORD BOT (Case Insensitive) ===
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None)
+
+# commands.Bot'e case_insensitive=True ekledim!
+bot = commands.Bot(
+    command_prefix='tc!',
+    intents=intents,
+    help_command=None,
+    case_insensitive=True  # <--- BÜYÜK/KÜÇÜK HARF DUYARSIZ
+)
 
 @bot.event
 async def on_ready():
