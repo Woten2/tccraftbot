@@ -5,7 +5,6 @@ import mcstatus
 from flask import Flask
 from threading import Thread
 import datetime
-import asyncio
 
 # === TOKEN ===
 BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
@@ -29,12 +28,11 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# === BOT (CASE INSENSITIVE - KESİN) ===
+# === BOT (CASE INSENSITIVE) ===
 intents = discord.Intents.all()
 
 class CustomBot(commands.Bot):
     async def get_prefix(self, message):
-        # Prefix'leri kontrol et (büyük/küçük harf duyarsız)
         prefixes = ['tc!', 'TC!', 'Tc!', 'tC!']
         for prefix in prefixes:
             if message.content.startswith(prefix):
@@ -48,8 +46,6 @@ bot = CustomBot(
     case_insensitive=True
 )
 
-# === KOMUTLAR ===
-
 @bot.event
 async def on_ready():
     print(f'✅ {bot.user} olarak giriş yapıldı!')
@@ -59,17 +55,14 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot:
         return
-    
-    # Prefix kontrolü
     prefixes = ['tc!', 'TC!', 'Tc!', 'tC!']
     for prefix in prefixes:
         if message.content.startswith(prefix):
             await bot.process_commands(message)
             return
-    
     await bot.process_commands(message)
 
-# ---------- tc!sunucu ----------
+# ---------- tc!sunucu (DM) ----------
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
@@ -96,19 +89,28 @@ async def sunucu_durumu(ctx):
         embed.add_field(name="👤 Çevrimiçi Oyuncular", value=f"```{player_list}```", inline=False)
         embed.set_footer(text="TCCRAFT • tc!yardım ile tüm komutları gör")
         
-        # EPHEMERAL - Sadece komutu yazan kişi görür
-        await ctx.send(embed=embed, ephemeral=True)
-        await ctx.message.delete()
+        # DM olarak gönder
+        await ctx.author.send(embed=embed)
+        if ctx.guild:
+            await ctx.message.delete()
+            await ctx.send("✅ Bilgiler DM olarak gönderildi!", delete_after=5)
     except Exception as e:
-        await ctx.send(f"❌ Hata: {e}", ephemeral=True)
-        await ctx.message.delete()
+        error_embed = discord.Embed(
+            title="❌ Hata!",
+            description=f"Sunucuya ulaşılamıyor veya bir hata oluştu.\n```{str(e)}```",
+            color=discord.Color.red()
+        )
+        await ctx.author.send(embed=error_embed)
+        if ctx.guild:
+            await ctx.message.delete()
+            await ctx.send("❌ Hata oluştu, DM'ni kontrol et!", delete_after=5)
 
-# ---------- tc!yardım ----------
+# ---------- tc!yardım (DM) ----------
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
         title="📚 TCCRAFT Bot Komutları",
-        description="Tüm komutlar **sadece size özel** olarak gönderilir!",
+        description="Tüm komutlar **DM** olarak gönderilir!",
         color=discord.Color.blue()
     )
     embed.add_field(name="🎮 `tc!sunucu`", value="Sunucu durumunu gösterir.", inline=False)
@@ -121,10 +123,12 @@ async def yardim(ctx):
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
-    await ctx.send(embed=embed, ephemeral=True)
-    await ctx.message.delete()
+    await ctx.author.send(embed=embed)
+    if ctx.guild:
+        await ctx.message.delete()
+        await ctx.send("📨 Yardım menüsü DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!ping ----------
+# ---------- tc!ping (DM) ----------
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -133,10 +137,11 @@ async def ping(ctx):
         description=f"Gecikme: **{latency} ms**",
         color=discord.Color.green() if latency < 100 else discord.Color.yellow() if latency < 300 else discord.Color.red()
     )
-    await ctx.send(embed=embed, ephemeral=True)
-    await ctx.message.delete()
+    await ctx.author.send(embed=embed)
+    if ctx.guild:
+        await ctx.message.delete()
 
-# ---------- tc!istatistik ----------
+# ---------- tc!istatistik (DM) ----------
 @bot.command(name='istatistik')
 async def istatistik(ctx):
     embed = discord.Embed(
@@ -150,10 +155,11 @@ async def istatistik(ctx):
     embed.add_field(name="⏰ Çalışma Süresi", value="Bot aktif ✅", inline=True)
     embed.add_field(name="🔗 Bağlantı", value="[TCCRAFT](https://tccraft.com.tr)", inline=True)
     
-    await ctx.send(embed=embed, ephemeral=True)
-    await ctx.message.delete()
+    await ctx.author.send(embed=embed)
+    if ctx.guild:
+        await ctx.message.delete()
 
-# ---------- tc!oyuncular ----------
+# ---------- tc!oyuncular (DM) ----------
 @bot.command(name='oyuncular')
 async def oyuncular(ctx):
     await ctx.typing()
@@ -163,7 +169,7 @@ async def oyuncular(ctx):
         players = query.players.names if query.players.names else ["Oyuncu yok"]
         
         if players == ["Oyuncu yok"]:
-            await ctx.send("📭 **Sunucuda şu anda oyuncu yok!**", ephemeral=True)
+            await ctx.author.send("📭 **Sunucuda şu anda oyuncu yok!**")
         else:
             player_list = "\n".join([f"• {p}" for p in players])
             embed = discord.Embed(
@@ -171,14 +177,17 @@ async def oyuncular(ctx):
                 description=player_list,
                 color=discord.Color.green()
             )
-            await ctx.send(embed=embed, ephemeral=True)
+            await ctx.author.send(embed=embed)
         
-        await ctx.message.delete()
+        if ctx.guild:
+            await ctx.message.delete()
+            await ctx.send("✅ Oyuncu listesi DM olarak gönderildi!", delete_after=5)
     except Exception as e:
-        await ctx.send(f"❌ Hata: {e}", ephemeral=True)
-        await ctx.message.delete()
+        await ctx.author.send(f"❌ Hata: {e}")
+        if ctx.guild:
+            await ctx.message.delete()
 
-# ---------- tc!trafik ----------
+# ---------- tc!trafik (DM) ----------
 @bot.command(name='trafik')
 async def trafik(ctx):
     try:
@@ -194,13 +203,16 @@ async def trafik(ctx):
         embed.add_field(name="📌 Sürüm", value=status.version.name, inline=True)
         embed.set_footer(text="TCCRAFT • Trafik bilgileri")
         
-        await ctx.send(embed=embed, ephemeral=True)
-        await ctx.message.delete()
+        await ctx.author.send(embed=embed)
+        if ctx.guild:
+            await ctx.message.delete()
+            await ctx.send("✅ Trafik bilgileri DM olarak gönderildi!", delete_after=5)
     except Exception as e:
-        await ctx.send(f"❌ Hata: {e}", ephemeral=True)
-        await ctx.message.delete()
+        await ctx.author.send(f"❌ Hata: {e}")
+        if ctx.guild:
+            await ctx.message.delete()
 
-# ---------- tc!zaman ----------
+# ---------- tc!zaman (DM) ----------
 @bot.command(name='zaman')
 async def zaman(ctx):
     now = datetime.datetime.now()
@@ -212,10 +224,11 @@ async def zaman(ctx):
     embed.add_field(name="🕐 Saat", value=now.strftime("%H:%M:%S"), inline=True)
     embed.add_field(name="🌍 Zaman Dilimi", value="UTC+3 (Türkiye)", inline=True)
     
-    await ctx.send(embed=embed, ephemeral=True)
-    await ctx.message.delete()
+    await ctx.author.send(embed=embed)
+    if ctx.guild:
+        await ctx.message.delete()
 
-# ---------- tc!botbilgi ----------
+# ---------- tc!botbilgi (DM) ----------
 @bot.command(name='botbilgi')
 async def botbilgi(ctx):
     embed = discord.Embed(
@@ -232,8 +245,9 @@ async def botbilgi(ctx):
     embed.add_field(name="🔗 Bağlantı", value="[TCCRAFT](https://tccraft.com.tr)", inline=False)
     embed.set_footer(text="TCCRAFT • tc!yardım ile tüm komutları gör")
     
-    await ctx.send(embed=embed, ephemeral=True)
-    await ctx.message.delete()
+    await ctx.author.send(embed=embed)
+    if ctx.guild:
+        await ctx.message.delete()
 
 # === BAŞLAT ===
 keep_alive()
