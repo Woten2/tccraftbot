@@ -28,29 +28,89 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# === BOT (CASE INSENSITIVE) ===
+# === BOT ===
 intents = discord.Intents.all()
+bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None, case_insensitive=True)
 
-class CustomBot(commands.Bot):
-    async def get_prefix(self, message):
-        prefixes = ['tc!', 'TC!', 'Tc!', 'tC!']
-        for prefix in prefixes:
-            if message.content.startswith(prefix):
-                return prefix
-        return 'tc!'
+# ============================================
+# ROL ID (BURAYA EKLENDİ)
+# ============================================
+ROL_ID = 1527706174424612934  # Sunucu Kesintileri Rolü
 
-bot = CustomBot(
-    command_prefix='tc!',
-    intents=intents,
-    help_command=None,
-    case_insensitive=True
-)
+# ============================================
+# SLASH KOMUT (ROL VERME)
+# ============================================
+@bot.tree.command(name="rolverme", description="Sunucu kesintilerinden haberdar olmak için rol al!")
+async def rolverme(interaction: discord.Interaction):
+    button = discord.ui.Button(
+        label="✅ Sunucu Kesintilerinden Haberdar Ol",
+        style=discord.ButtonStyle.green,
+        custom_id="rol_al_butonu"
+    )
+    
+    view = discord.ui.View()
+    view.add_item(button)
+    
+    embed = discord.Embed(
+        title="🔔 Sunucu Kesintileri Bildirimleri",
+        description="Sunucu kesintileri, bakım ve güncellemeler hakkında anında bilgi almak için aşağıdaki butona tıkla!",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name="📌 Ne Kazanırsın?",
+        value="• Anlık kesinti bildirimleri\n• Bakım duyuruları\n• Güncelleme haberleri\n• Özel etkinlik duyuruları",
+        inline=False
+    )
+    embed.set_footer(text="TCCRAFT • Her zaman bilgilen!")
+    
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
-# === GİZLİ SUNUCU BİLGİLERİ (Kodda, gözükmez) ===
-BASE_IP = "104.239.83.40"          # Gizli - sadece kodda
-SERVER_DOMAIN = "oyna.tccraft.com.tr"  # Gösterilecek domain
+# ============================================
+# BUTON ETKİLEŞİMİ
+# ============================================
+@bot.event
+async def on_interaction(interaction: discord.Interaction):
+    if interaction.type == discord.InteractionType.component:
+        if interaction.data.get("custom_id") == "rol_al_butonu":
+            role = interaction.guild.get_role(ROL_ID)
+            
+            if role is None:
+                await interaction.response.send_message(
+                    "❌ **Rol bulunamadı!** Lütfen bot sahibine bildirin.",
+                    ephemeral=True
+                )
+                return
+            
+            if role in interaction.user.roles:
+                await interaction.response.send_message(
+                    f"❌ **Zaten `{role.name}` rolüne sahipsin!**",
+                    ephemeral=True
+                )
+                return
+            
+            try:
+                await interaction.user.add_roles(role)
+                await interaction.response.send_message(
+                    f"✅ **Başarıyla `{role.name}` rolü verildi!**\nArtık sunucu kesintilerinden haberdar olacaksın.",
+                    ephemeral=True
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "❌ **Botun yetkisi yok!** Botun rol verme yetkisi olduğundan emin ol.",
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    f"❌ **Bir hata oluştu:** {e}",
+                    ephemeral=True
+                )
 
-# Portlar gizli - sadece kodda (25566-25571)
+# ============================================
+# PREFIX KOMUTLAR
+# ============================================
+GIZLI_IP = "104.239.83.40"
+SERVER_DOMAIN = "oyna.tccraft.com.tr"
+
 SERVERS = {
     "Lobi": 25566,
     "Towny": 25567,
@@ -64,6 +124,11 @@ SERVERS = {
 async def on_ready():
     print(f'✅ {bot.user} olarak giriş yapıldı!')
     await bot.change_presence(activity=discord.Game(name="tc!yardım"))
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ {len(synced)} slash komut senkronize edildi!")
+    except Exception as e:
+        print(f"❌ Slash komut senkronizasyon hatası: {e}")
 
 @bot.event
 async def on_message(message):
@@ -76,7 +141,7 @@ async def on_message(message):
             return
     await bot.process_commands(message)
 
-# ---------- tc!sunucu (TÜM SUNUCULAR - PORTLAR GİZLİ) ----------
+# ---------- tc!sunucu ----------
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
@@ -93,7 +158,7 @@ async def sunucu_durumu(ctx):
     
     for server_name, port in SERVERS.items():
         try:
-            server = mcstatus.JavaServer(f"{BASE_IP}:{port}", timeout=3)
+            server = mcstatus.JavaServer(f"{GIZLI_IP}:{port}", timeout=5)
             status = server.status()
             
             online_count += 1
@@ -104,7 +169,6 @@ async def sunucu_durumu(ctx):
             else:
                 status_emoji = "🟡"
             
-            # Gösterimde port yok, sadece sunucu adı ve oyuncu bilgisi
             embed.add_field(
                 name=f"{status_emoji} {server_name}",
                 value=f"👥 `{status.players.online}` / {status.players.max}\n"
@@ -128,7 +192,7 @@ async def sunucu_durumu(ctx):
         await ctx.message.delete()
         await ctx.send("✅ Sunucu bilgileri DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!yardım (PORTLAR GÖSTERMEZ) ----------
+# ---------- tc!yardım ----------
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
@@ -136,21 +200,14 @@ async def yardim(ctx):
         description="Tüm komutlar **DM** olarak gönderilir!",
         color=discord.Color.blue()
     )
-    embed.add_field(
-        name="🎮 `tc!sunucu`",
-        value=f"**{SERVER_DOMAIN}** üzerindeki tüm sunucuların durumunu gösterir.",
-        inline=False
-    )
-    embed.add_field(
-        name="👤 `tc!oyuncular`",
-        value="Tüm sunuculardaki çevrimiçi oyuncuları listeler.",
-        inline=False
-    )
+    embed.add_field(name="🎮 `tc!sunucu`", value=f"**{SERVER_DOMAIN}** üzerindeki tüm sunucuların durumunu gösterir.", inline=False)
+    embed.add_field(name="👤 `tc!oyuncular`", value="Tüm sunuculardaki çevrimiçi oyuncuları listeler.", inline=False)
     embed.add_field(name="❓ `tc!yardım`", value="Bu komut listesini gösterir.", inline=False)
     embed.add_field(name="🌐 `tc!ping`", value="Botun gecikmesini gösterir.", inline=False)
     embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
+    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al!", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.author.send(embed=embed)
@@ -158,7 +215,7 @@ async def yardim(ctx):
         await ctx.message.delete()
         await ctx.send("📨 Yardım menüsü DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!oyuncular (TÜM SUNUCULAR - PORT GÖSTERMEZ) ----------
+# ---------- tc!oyuncular ----------
 @bot.command(name='oyuncular')
 async def oyuncular(ctx):
     await ctx.typing()
@@ -174,7 +231,7 @@ async def oyuncular(ctx):
     
     for server_name, port in SERVERS.items():
         try:
-            server = mcstatus.JavaServer(f"{BASE_IP}:{port}", timeout=3)
+            server = mcstatus.JavaServer(f"{GIZLI_IP}:{port}", timeout=5)
             query = server.query()
             players = query.players.names if query.players.names else []
             
@@ -198,7 +255,7 @@ async def oyuncular(ctx):
         except:
             embed.add_field(
                 name=f"🔴 {server_name}",
-                value="*Kapalı*",
+                value="*Sunucu kapalı veya ulaşılamıyor*",
                 inline=False
             )
     
