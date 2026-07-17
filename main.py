@@ -6,20 +6,19 @@ from flask import Flask
 from threading import Thread
 import datetime
 
-# === TOKEN'ı ENVIRONMENT VARIABLE'DAN AL ===
+# === TOKEN ===
 BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
 
 if not BOT_TOKEN:
-    print("❌ DISCORD_TOKEN environment variable'ı bulunamadı!")
-    print("📌 Render'a DISCORD_TOKEN eklemeyi unutma!")
+    print("❌ DISCORD_TOKEN bulunamadı!")
     exit(1)
 
-# === FLASK WEB SUNUCU ===
+# === FLASK ===
 app = Flask('')
 
 @app.route('/')
 def wake_up():
-    return "Bot aktif ve çalışıyor! ✅"
+    return "Bot aktif! ✅"
 
 def run_flask():
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
@@ -29,8 +28,10 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# === DISCORD BOT (Case Insensitive) ===
+# === BOT (CASE INSENSITIVE - KESİN ÇÖZÜM) ===
 intents = discord.Intents.all()
+
+# 1. YÖNTEM: Bot oluştururken case_insensitive=True
 bot = commands.Bot(
     command_prefix='tc!',
     intents=intents,
@@ -38,18 +39,34 @@ bot = commands.Bot(
     case_insensitive=True
 )
 
+# 2. YÖNTEM: Ekstra olarak on_message ile prefix kontrolü (YEDEK)
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+    
+    # Prefix kontrolü (büyük/küçük harf duyarsız)
+    prefix = 'tc!'
+    content = message.content.lower()
+    
+    if content.startswith(prefix):
+        # Komutu işle
+        await bot.process_commands(message)
+    else:
+        # Diğer mesajları işleme
+        await bot.process_commands(message)
+
 @bot.event
 async def on_ready():
     print(f'✅ {bot.user} olarak giriş yapıldı!')
     await bot.change_presence(activity=discord.Game(name="tc!yardım"))
 
-# ---------- tc!sunucu (EPHEMERAL) ----------
+# ---------- tc!sunucu ----------
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
     try:
-        server_ip = "oyna.tccraft.com.tr"
-        server = mcstatus.JavaServer(server_ip, timeout=5)
+        server = mcstatus.JavaServer("oyna.tccraft.com.tr", timeout=5)
         status = server.status()
         query = server.query()
         
@@ -71,20 +88,13 @@ async def sunucu_durumu(ctx):
         embed.add_field(name="👤 Çevrimiçi Oyuncular", value=f"```{player_list}```", inline=False)
         embed.set_footer(text="TCCRAFT • tc!yardım ile tüm komutları gör")
         
-        # EPHEMERAL - Sadece komutu yazan kişi görür, silinince kaybolur
         await ctx.send(embed=embed, ephemeral=True)
         await ctx.message.delete()
-        
     except Exception as e:
-        error_embed = discord.Embed(
-            title="❌ Hata!",
-            description=f"Sunucuya ulaşılamıyor veya bir hata oluştu.\n```{str(e)}```",
-            color=discord.Color.red()
-        )
-        await ctx.send(embed=error_embed, ephemeral=True)
+        await ctx.send(f"❌ Hata: {e}", ephemeral=True)
         await ctx.message.delete()
 
-# ---------- tc!yardım (EPHEMERAL) ----------
+# ---------- tc!yardım ----------
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
@@ -97,15 +107,15 @@ async def yardim(ctx):
     embed.add_field(name="🌐 `tc!ping`", value="Botun gecikmesini gösterir.", inline=False)
     embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
     embed.add_field(name="👤 `tc!oyuncular`", value="Çevrimiçi oyuncuları listeler.", inline=False)
-    embed.add_field(name="📈 `tc!trafik`", value="Sunucunun günlük oyuncu trafiğini gösterir.", inline=False)
-    embed.add_field(name="⏰ `tc!zaman`", value="Botun bulunduğu zaman dilimini gösterir.", inline=False)
+    embed.add_field(name="📈 `tc!trafik`", value="Sunucu trafiğini gösterir.", inline=False)
+    embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.send(embed=embed, ephemeral=True)
     await ctx.message.delete()
 
-# ---------- tc!ping (EPHEMERAL) ----------
+# ---------- tc!ping ----------
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -117,7 +127,7 @@ async def ping(ctx):
     await ctx.send(embed=embed, ephemeral=True)
     await ctx.message.delete()
 
-# ---------- tc!istatistik (EPHEMERAL) ----------
+# ---------- tc!istatistik ----------
 @bot.command(name='istatistik')
 async def istatistik(ctx):
     embed = discord.Embed(
@@ -134,7 +144,7 @@ async def istatistik(ctx):
     await ctx.send(embed=embed, ephemeral=True)
     await ctx.message.delete()
 
-# ---------- tc!oyuncular (EPHEMERAL) ----------
+# ---------- tc!oyuncular ----------
 @bot.command(name='oyuncular')
 async def oyuncular(ctx):
     await ctx.typing()
@@ -159,7 +169,7 @@ async def oyuncular(ctx):
         await ctx.send(f"❌ Hata: {e}", ephemeral=True)
         await ctx.message.delete()
 
-# ---------- tc!trafik (EPHEMERAL) ----------
+# ---------- tc!trafik ----------
 @bot.command(name='trafik')
 async def trafik(ctx):
     try:
@@ -181,7 +191,7 @@ async def trafik(ctx):
         await ctx.send(f"❌ Hata: {e}", ephemeral=True)
         await ctx.message.delete()
 
-# ---------- tc!zaman (EPHEMERAL) ----------
+# ---------- tc!zaman ----------
 @bot.command(name='zaman')
 async def zaman(ctx):
     now = datetime.datetime.now()
@@ -196,7 +206,7 @@ async def zaman(ctx):
     await ctx.send(embed=embed, ephemeral=True)
     await ctx.message.delete()
 
-# ---------- tc!botbilgi (EPHEMERAL) ----------
+# ---------- tc!botbilgi ----------
 @bot.command(name='botbilgi')
 async def botbilgi(ctx):
     embed = discord.Embed(
