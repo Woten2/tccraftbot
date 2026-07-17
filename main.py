@@ -68,10 +68,6 @@ async def rolverme(interaction: discord.Interaction):
     view.add_item(al_button)
     view.add_item(cikar_button)
     
-    # Kullanıcının mevcut durumu
-    has_role = role in interaction.user.roles
-    durum = f"✅ **{role.name}** rolüne sahipsin!" if has_role else f"❌ **{role.name}** rolüne sahip değilsin!"
-    
     embed = discord.Embed(
         title="🔔 Sunucu Kesintileri Bildirimleri",
         description="Sunucu kesintileri, bakım ve güncellemeler hakkında anında bilgi almak için aşağıdaki butonlardan birini seç!",
@@ -80,11 +76,6 @@ async def rolverme(interaction: discord.Interaction):
     embed.add_field(
         name="📌 Ne Kazanırsın?",
         value="• Anlık kesinti bildirimleri\n• Bakım duyuruları\n• Güncelleme haberleri\n• Özel etkinlik duyuruları",
-        inline=False
-    )
-    embed.add_field(
-        name="📌 Mevcut Durumun",
-        value=durum,
         inline=False
     )
     embed.set_footer(text="TCCRAFT • Her zaman bilgilen!")
