@@ -8,6 +8,7 @@ from threading import Thread
 import datetime
 import asyncio
 import random
+import aiohttp
 
 # === TOKEN ===
 BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
@@ -16,12 +17,12 @@ if not BOT_TOKEN:
     print("❌ DISCORD_TOKEN bulunamadı!")
     exit(1)
 
-# === FLASK ===
+# === FLASK WEB SUNUCU (Wake-up) ===
 app = Flask('')
 
 @app.route('/')
 def wake_up():
-    return "Bot aktif! ✅"
+    return "Bot aktif ve çalışıyor! ✅"
 
 def run_flask():
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
@@ -31,7 +32,7 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# === BOT ===
+# === DISCORD BOT ===
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None, case_insensitive=True)
 
@@ -56,7 +57,7 @@ SERVERS = {
 ROL_ID = 1527706174424612934  # Sunucu Kesintileri Rolü
 
 # ============================================
-# OLAY (EVENT)
+# OLAY (EVENT) - on_ready
 # ============================================
 @bot.event
 async def on_ready():
@@ -68,6 +69,9 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Slash komut senkronizasyon hatası: {e}")
 
+# ============================================
+# OLAY (EVENT) - on_message (Case Insensitive)
+# ============================================
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -80,7 +84,39 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # ============================================
-# SLASH KOMUT: /rolverme (Sadece Yetkililer)
+# MODAL - KOD GİRME KUTUSU (TÜM SUNUCULAR İÇİN)
+# ============================================
+class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
+    def __init__(self, sunucu_adi):
+        super().__init__()
+        self.sunucu_adi = sunucu_adi
+        
+        self.kod = discord.ui.TextInput(
+            label=f"Minecraft {sunucu_adi} - Aldığın Kod",
+            placeholder="Örnek: 123456",
+            min_length=4,
+            max_length=20,
+            required=True
+        )
+        self.add_item(self.kod)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        kod = self.kod.value
+        sunucu = self.sunucu_adi
+        
+        await interaction.response.send_message(
+            f"✅ **Kod alındı!**\n"
+            f"Sunucu: `{sunucu}`\n"
+            f"Kod: `{kod}`\n\n"
+            f"⏳ Minecraft sunucusu ile doğrulanıyor...",
+            ephemeral=True
+        )
+        
+        # Burada RCON ile sunucuya komut gönder
+        # Örnek: /skript run discord_esle("oyuncu", kod)
+
+# ============================================
+# SLASH KOMUT: /rolverme
 # ============================================
 @bot.tree.command(
     name="rolverme",
@@ -128,66 +164,164 @@ async def rolverme(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 # ============================================
-# SLASH KOMUT: /eslebuton (Sadece Yetkililer)
+# SLASH KOMUT: /eslebutonboxpvp
 # ============================================
 @bot.tree.command(
-    name="eslebuton",
-    description="Hesap eşleştirme butonu oluştur! (Sadece Yetkililer)"
+    name="eslebutonboxpvp",
+    description="BoxPVP sunucusu için hesap eşleştirme butonu oluştur!"
 )
 @app_commands.default_permissions(administrator=True)
-async def eslebuton(interaction: discord.Interaction):
-    
+async def eslebutonboxpvp(interaction: discord.Interaction):
     button = discord.ui.Button(
-        label="🔗 Hesabını Eşleştir",
+        label="🔗 BoxPVP - Hesabını Eşleştir",
         style=discord.ButtonStyle.primary,
-        custom_id="hesap_esle"
+        custom_id="esle_boxpvp"
     )
-    
     view = discord.ui.View()
     view.add_item(button)
     
     embed = discord.Embed(
-        title="🔗 Hesap Eşleştirme",
-        description="**3 Günlük VIP Ödülü!** 🎉\n\n"
-                    "Hesabını eşleştir ve 3 günlük VIP kazan!",
+        title="🔗 BoxPVP Hesap Eşleştirme",
+        description="**3 Günlük VIP Ödülü!** 🎉",
         color=discord.Color.gold()
     )
     embed.add_field(
         name="📝 Nasıl Yapılır?",
-        value="1️⃣ **Minecraft'ta** `/discord link` yaz ve kodu al\n"
-              "2️⃣ Aşağıdaki **'Hesabını Eşleştir'** butonuna tıkla\n"
+        value="1️⃣ **Minecraft BoxPVP'de** `/discordesle` yaz ve kodu al\n"
+              "2️⃣ Aşağıdaki butona tıkla\n"
               "3️⃣ Aldığın kodu kutuya yaz ve gönder\n"
               "4️⃣ **3 Günlük VIP** kazan! 🎁",
         inline=False
     )
-    embed.set_footer(text="TCCRAFT • Sadece yetkililer bu komutu kullanabilir!")
-    
     await interaction.response.send_message(embed=embed, view=view)
 
 # ============================================
-# KOD GİRME KUTUSU (MODAL)
+# SLASH KOMUT: /eslebutonsmp
 # ============================================
-class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
-    kod = discord.ui.TextInput(
-        label="Minecraft'tan Aldığın Kod",
-        placeholder="Örnek: 123456",
-        min_length=4,
-        max_length=20,
-        required=True
+@bot.tree.command(
+    name="eslebutonsmp",
+    description="SMP sunucusu için hesap eşleştirme butonu oluştur!"
+)
+@app_commands.default_permissions(administrator=True)
+async def eslebutonsmp(interaction: discord.Interaction):
+    button = discord.ui.Button(
+        label="🔗 SMP - Hesabını Eşleştir",
+        style=discord.ButtonStyle.primary,
+        custom_id="esle_smp"
     )
+    view = discord.ui.View()
+    view.add_item(button)
     
-    async def on_submit(self, interaction: discord.Interaction):
-        kod = self.kod.value
-        
-        await interaction.response.send_message(
-            f"✅ **Kod alındı!**\n"
-            f"Kod: `{kod}`\n\n"
-            f"⏳ Minecraft sunucusu ile doğrulanıyor...",
-            ephemeral=True
-        )
-        
-        # Burada RCON veya Webhook ile sunucuya kod gönder
-        # await rcon_command(f"discordlink {interaction.user.name} {kod}")
+    embed = discord.Embed(
+        title="🔗 SMP Hesap Eşleştirme",
+        description="**3 Günlük VIP Ödülü!** 🎉",
+        color=discord.Color.gold()
+    )
+    embed.add_field(
+        name="📝 Nasıl Yapılır?",
+        value="1️⃣ **Minecraft SMP'de** `/discordesle` yaz ve kodu al\n"
+              "2️⃣ Aşağıdaki butona tıkla\n"
+              "3️⃣ Aldığın kodu kutuya yaz ve gönder\n"
+              "4️⃣ **3 Günlük VIP** kazan! 🎁",
+        inline=False
+    )
+    await interaction.response.send_message(embed=embed, view=view)
+
+# ============================================
+# SLASH KOMUT: /eslebutontowny
+# ============================================
+@bot.tree.command(
+    name="eslebutontowny",
+    description="Towny sunucusu için hesap eşleştirme butonu oluştur!"
+)
+@app_commands.default_permissions(administrator=True)
+async def eslebutontowny(interaction: discord.Interaction):
+    button = discord.ui.Button(
+        label="🔗 Towny - Hesabını Eşleştir",
+        style=discord.ButtonStyle.primary,
+        custom_id="esle_towny"
+    )
+    view = discord.ui.View()
+    view.add_item(button)
+    
+    embed = discord.Embed(
+        title="🔗 Towny Hesap Eşleştirme",
+        description="**3 Günlük VIP Ödülü!** 🎉",
+        color=discord.Color.gold()
+    )
+    embed.add_field(
+        name="📝 Nasıl Yapılır?",
+        value="1️⃣ **Minecraft Towny'de** `/discordesle` yaz ve kodu al\n"
+              "2️⃣ Aşağıdaki butona tıkla\n"
+              "3️⃣ Aldığın kodu kutuya yaz ve gönder\n"
+              "4️⃣ **3 Günlük VIP** kazan! 🎁",
+        inline=False
+    )
+    await interaction.response.send_message(embed=embed, view=view)
+
+# ============================================
+# SLASH KOMUT: /eslebutontrappvp
+# ============================================
+@bot.tree.command(
+    name="eslebutontrappvp",
+    description="TrapPVP sunucusu için hesap eşleştirme butonu oluştur!"
+)
+@app_commands.default_permissions(administrator=True)
+async def eslebutontrappvp(interaction: discord.Interaction):
+    button = discord.ui.Button(
+        label="🔗 TrapPVP - Hesabını Eşleştir",
+        style=discord.ButtonStyle.primary,
+        custom_id="esle_trappvp"
+    )
+    view = discord.ui.View()
+    view.add_item(button)
+    
+    embed = discord.Embed(
+        title="🔗 TrapPVP Hesap Eşleştirme",
+        description="**3 Günlük VIP Ödülü!** 🎉",
+        color=discord.Color.gold()
+    )
+    embed.add_field(
+        name="📝 Nasıl Yapılır?",
+        value="1️⃣ **Minecraft TrapPVP'de** `/discordesle` yaz ve kodu al\n"
+              "2️⃣ Aşağıdaki butona tıkla\n"
+              "3️⃣ Aldığın kodu kutuya yaz ve gönder\n"
+              "4️⃣ **3 Günlük VIP** kazan! 🎁",
+        inline=False
+    )
+    await interaction.response.send_message(embed=embed, view=view)
+
+# ============================================
+# SLASH KOMUT: /eslebutonskyblock
+# ============================================
+@bot.tree.command(
+    name="eslebutonskyblock",
+    description="SkyBlock sunucusu için hesap eşleştirme butonu oluştur!"
+)
+@app_commands.default_permissions(administrator=True)
+async def eslebutonskyblock(interaction: discord.Interaction):
+    button = discord.ui.Button(
+        label="🔗 SkyBlock - Hesabını Eşleştir",
+        style=discord.ButtonStyle.primary,
+        custom_id="esle_skyblock"
+    )
+    view = discord.ui.View()
+    view.add_item(button)
+    
+    embed = discord.Embed(
+        title="🔗 SkyBlock Hesap Eşleştirme",
+        description="**3 Günlük VIP Ödülü!** 🎉",
+        color=discord.Color.gold()
+    )
+    embed.add_field(
+        name="📝 Nasıl Yapılır?",
+        value="1️⃣ **Minecraft SkyBlock'ta** `/discordesle` yaz ve kodu al\n"
+              "2️⃣ Aşağıdaki butona tıkla\n"
+              "3️⃣ Aldığın kodu kutuya yaz ve gönder\n"
+              "4️⃣ **3 Günlük VIP** kazan! 🎁",
+        inline=False
+    )
+    await interaction.response.send_message(embed=embed, view=view)
 
 # ============================================
 # BUTON ETKİLEŞİMLERİ
@@ -195,10 +329,11 @@ class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
-        role = interaction.guild.get_role(ROL_ID)
+        custom_id = interaction.data.get("custom_id")
         
         # --- /rolverme BUTONLARI ---
-        if interaction.data.get("custom_id") == "rol_al":
+        if custom_id == "rol_al":
+            role = interaction.guild.get_role(ROL_ID)
             if role is None:
                 await interaction.response.send_message("❌ **Rol bulunamadı!**", ephemeral=True)
                 return
@@ -212,7 +347,8 @@ async def on_interaction(interaction: discord.Interaction):
                 await interaction.response.send_message("❌ **Botun yetkisi yok!**", ephemeral=True)
             return
         
-        elif interaction.data.get("custom_id") == "rol_cikar":
+        elif custom_id == "rol_cikar":
+            role = interaction.guild.get_role(ROL_ID)
             if role is None:
                 await interaction.response.send_message("❌ **Rol bulunamadı!**", ephemeral=True)
                 return
@@ -226,16 +362,21 @@ async def on_interaction(interaction: discord.Interaction):
                 await interaction.response.send_message("❌ **Botun yetkisi yok!**", ephemeral=True)
             return
         
-        # --- /eslebuton BUTONU ---
-        elif interaction.data.get("custom_id") == "hesap_esle":
-            await interaction.response.send_modal(KodModal())
-            return
+        # --- /eslebuton BUTONLARI ---
+        elif custom_id == "esle_boxpvp":
+            await interaction.response.send_modal(KodModal("BoxPVP"))
+        elif custom_id == "esle_smp":
+            await interaction.response.send_modal(KodModal("SMP"))
+        elif custom_id == "esle_towny":
+            await interaction.response.send_modal(KodModal("Towny"))
+        elif custom_id == "esle_trappvp":
+            await interaction.response.send_modal(KodModal("TrapPVP"))
+        elif custom_id == "esle_skyblock":
+            await interaction.response.send_modal(KodModal("SkyBlock"))
 
 # ============================================
-# PREFIX KOMUTLAR
+# PREFIX KOMUT: tc!sunucu
 # ============================================
-
-# ---------- tc!sunucu ----------
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
     await ctx.typing()
@@ -286,7 +427,9 @@ async def sunucu_durumu(ctx):
         await ctx.message.delete()
         await ctx.send("✅ Sunucu bilgileri DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!yardım ----------
+# ============================================
+# PREFIX KOMUT: tc!yardım
+# ============================================
 @bot.command(name='yardım')
 async def yardim(ctx):
     embed = discord.Embed(
@@ -302,7 +445,11 @@ async def yardim(ctx):
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
     embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar! **(Sadece Yetkililer)**", inline=False)
-    embed.add_field(name="📌 `/eslebuton`", value="Hesap eşleştirme butonu oluştur! **(Sadece Yetkililer)**", inline=False)
+    embed.add_field(name="📌 `/eslebutonboxpvp`", value="BoxPVP sunucusu için hesap eşleştirme butonu oluştur! **(Sadece Yetkililer)**", inline=False)
+    embed.add_field(name="📌 `/eslebutonsmp`", value="SMP sunucusu için hesap eşleştirme butonu oluştur! **(Sadece Yetkililer)**", inline=False)
+    embed.add_field(name="📌 `/eslebutontowny`", value="Towny sunucusu için hesap eşleştirme butonu oluştur! **(Sadece Yetkililer)**", inline=False)
+    embed.add_field(name="📌 `/eslebutontrappvp`", value="TrapPVP sunucusu için hesap eşleştirme butonu oluştur! **(Sadece Yetkililer)**", inline=False)
+    embed.add_field(name="📌 `/eslebutonskyblock`", value="SkyBlock sunucusu için hesap eşleştirme butonu oluştur! **(Sadece Yetkililer)**", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.author.send(embed=embed)
@@ -310,7 +457,9 @@ async def yardim(ctx):
         await ctx.message.delete()
         await ctx.send("📨 Yardım menüsü DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!oyuncular ----------
+# ============================================
+# PREFIX KOMUT: tc!oyuncular
+# ============================================
 @bot.command(name='oyuncular')
 async def oyuncular(ctx):
     await ctx.typing()
@@ -364,7 +513,9 @@ async def oyuncular(ctx):
         await ctx.message.delete()
         await ctx.send("✅ Oyuncu listesi DM olarak gönderildi!", delete_after=5)
 
-# ---------- tc!ping ----------
+# ============================================
+# PREFIX KOMUT: tc!ping
+# ============================================
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -377,7 +528,9 @@ async def ping(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# ---------- tc!istatistik ----------
+# ============================================
+# PREFIX KOMUT: tc!istatistik
+# ============================================
 @bot.command(name='istatistik')
 async def istatistik(ctx):
     embed = discord.Embed(
@@ -395,7 +548,9 @@ async def istatistik(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# ---------- tc!zaman ----------
+# ============================================
+# PREFIX KOMUT: tc!zaman
+# ============================================
 @bot.command(name='zaman')
 async def zaman(ctx):
     now = datetime.datetime.now()
@@ -411,7 +566,9 @@ async def zaman(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# ---------- tc!botbilgi ----------
+# ============================================
+# PREFIX KOMUT: tc!botbilgi
+# ============================================
 @bot.command(name='botbilgi')
 async def botbilgi(ctx):
     embed = discord.Embed(
@@ -432,6 +589,8 @@ async def botbilgi(ctx):
     if ctx.guild:
         await ctx.message.delete()
 
-# === BAŞLAT ===
+# ============================================
+# BOTU BAŞLAT
+# ============================================
 keep_alive()
 bot.run(BOT_TOKEN)
