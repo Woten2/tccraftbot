@@ -1,11 +1,13 @@
 import os
 import discord
 from discord.ext import commands
-from discord import app_commands  # <--- EKLENDI
+from discord import app_commands
 import mcstatus
 from flask import Flask
 from threading import Thread
 import datetime
+import asyncio
+import random
 
 # === TOKEN ===
 BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
@@ -34,18 +36,57 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='tc!', intents=intents, help_command=None, case_insensitive=True)
 
 # ============================================
+# GİZLİ SUNUCU BİLGİLERİ
+# ============================================
+GIZLI_IP = "104.239.83.40"
+SERVER_DOMAIN = "oyna.tccraft.com.tr"
+
+SERVERS = {
+    "Lobi": 25566,
+    "Towny": 25567,
+    "SMP": 25568,
+    "SkyBlock": 25569,
+    "BoxPVP": 25570,
+    "TrapPVP": 25571
+}
+
+# ============================================
 # ROL ID
 # ============================================
 ROL_ID = 1527706174424612934  # Sunucu Kesintileri Rolü
 
 # ============================================
-# SLASH KOMUT (SADECE YETKİLİLER - DÜZELTİLDİ)
+# OLAY (EVENT)
+# ============================================
+@bot.event
+async def on_ready():
+    print(f'✅ {bot.user} olarak giriş yapıldı!')
+    await bot.change_presence(activity=discord.Game(name="tc!yardım"))
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ {len(synced)} slash komut senkronize edildi!")
+    except Exception as e:
+        print(f"❌ Slash komut senkronizasyon hatası: {e}")
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+    prefixes = ['tc!', 'TC!', 'Tc!', 'tC!']
+    for prefix in prefixes:
+        if message.content.startswith(prefix):
+            await bot.process_commands(message)
+            return
+    await bot.process_commands(message)
+
+# ============================================
+# SLASH KOMUT: /rolverme (Sadece Yetkililer)
 # ============================================
 @bot.tree.command(
     name="rolverme",
     description="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar!"
 )
-@app_commands.default_permissions(administrator=True)  # <--- YENİ YÖNTEM
+@app_commands.default_permissions(administrator=True)
 async def rolverme(interaction: discord.Interaction):
     role = interaction.guild.get_role(ROL_ID)
     
@@ -56,7 +97,6 @@ async def rolverme(interaction: discord.Interaction):
         )
         return
     
-    # İki buton oluştur
     al_button = discord.ui.Button(
         label="✅ Rol Al",
         style=discord.ButtonStyle.green,
@@ -88,6 +128,68 @@ async def rolverme(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 # ============================================
+# SLASH KOMUT: /eslebuton (Sadece Yetkililer)
+# ============================================
+@bot.tree.command(
+    name="eslebuton",
+    description="Hesap eşleştirme butonu oluştur! (Sadece Yetkililer)"
+)
+@app_commands.default_permissions(administrator=True)
+async def eslebuton(interaction: discord.Interaction):
+    
+    button = discord.ui.Button(
+        label="🔗 Hesabını Eşleştir",
+        style=discord.ButtonStyle.primary,
+        custom_id="hesap_esle"
+    )
+    
+    view = discord.ui.View()
+    view.add_item(button)
+    
+    embed = discord.Embed(
+        title="🔗 Hesap Eşleştirme",
+        description="**3 Günlük VIP Ödülü!** 🎉\n\n"
+                    "Hesabını eşleştir ve 3 günlük VIP kazan!",
+        color=discord.Color.gold()
+    )
+    embed.add_field(
+        name="📝 Nasıl Yapılır?",
+        value="1️⃣ **Minecraft'ta** `/discord link` yaz ve kodu al\n"
+              "2️⃣ Aşağıdaki **'Hesabını Eşleştir'** butonuna tıkla\n"
+              "3️⃣ Aldığın kodu kutuya yaz ve gönder\n"
+              "4️⃣ **3 Günlük VIP** kazan! 🎁",
+        inline=False
+    )
+    embed.set_footer(text="TCCRAFT • Sadece yetkililer bu komutu kullanabilir!")
+    
+    await interaction.response.send_message(embed=embed, view=view)
+
+# ============================================
+# KOD GİRME KUTUSU (MODAL)
+# ============================================
+class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
+    kod = discord.ui.TextInput(
+        label="Minecraft'tan Aldığın Kod",
+        placeholder="Örnek: 123456",
+        min_length=4,
+        max_length=20,
+        required=True
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        kod = self.kod.value
+        
+        await interaction.response.send_message(
+            f"✅ **Kod alındı!**\n"
+            f"Kod: `{kod}`\n\n"
+            f"⏳ Minecraft sunucusu ile doğrulanıyor...",
+            ephemeral=True
+        )
+        
+        # Burada RCON veya Webhook ile sunucuya kod gönder
+        # await rcon_command(f"discordlink {interaction.user.name} {kod}")
+
+# ============================================
 # BUTON ETKİLEŞİMLERİ
 # ============================================
 @bot.event
@@ -95,100 +197,43 @@ async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
         role = interaction.guild.get_role(ROL_ID)
         
-        if role is None:
-            await interaction.response.send_message(
-                "❌ **Rol bulunamadı!** Lütfen bot sahibine bildirin.",
-                ephemeral=True
-            )
-            return
-        
-        # --- ROL AL BUTONU ---
+        # --- /rolverme BUTONLARI ---
         if interaction.data.get("custom_id") == "rol_al":
-            if role in interaction.user.roles:
-                await interaction.response.send_message(
-                    f"❌ **Zaten `{role.name}` rolüne sahipsin!**",
-                    ephemeral=True
-                )
+            if role is None:
+                await interaction.response.send_message("❌ **Rol bulunamadı!**", ephemeral=True)
                 return
-            
+            if role in interaction.user.roles:
+                await interaction.response.send_message(f"❌ **Zaten `{role.name}` rolüne sahipsin!**", ephemeral=True)
+                return
             try:
                 await interaction.user.add_roles(role)
-                await interaction.response.send_message(
-                    f"✅ **Başarıyla `{role.name}` rolü verildi!**\nArtık sunucu kesintilerinden haberdar olacaksın.",
-                    ephemeral=True
-                )
-            except discord.Forbidden:
-                await interaction.response.send_message(
-                    "❌ **Botun yetkisi yok!** Botun rol verme yetkisi olduğundan emin ol.",
-                    ephemeral=True
-                )
-            except Exception as e:
-                await interaction.response.send_message(
-                    f"❌ **Bir hata oluştu:** {e}",
-                    ephemeral=True
-                )
+                await interaction.response.send_message(f"✅ **Başarıyla `{role.name}` rolü verildi!**", ephemeral=True)
+            except:
+                await interaction.response.send_message("❌ **Botun yetkisi yok!**", ephemeral=True)
+            return
         
-        # --- ROL ÇIKAR BUTONU ---
         elif interaction.data.get("custom_id") == "rol_cikar":
-            if role not in interaction.user.roles:
-                await interaction.response.send_message(
-                    f"❌ **Zaten `{role.name}` rolüne sahip değilsin!**",
-                    ephemeral=True
-                )
+            if role is None:
+                await interaction.response.send_message("❌ **Rol bulunamadı!**", ephemeral=True)
                 return
-            
+            if role not in interaction.user.roles:
+                await interaction.response.send_message(f"❌ **Zaten `{role.name}` rolüne sahip değilsin!**", ephemeral=True)
+                return
             try:
                 await interaction.user.remove_roles(role)
-                await interaction.response.send_message(
-                    f"✅ **Başarıyla `{role.name}` rolü çıkarıldı!**\nArtık bildirim almayacaksın.",
-                    ephemeral=True
-                )
-            except discord.Forbidden:
-                await interaction.response.send_message(
-                    "❌ **Botun yetkisi yok!** Botun rol çıkarma yetkisi olduğundan emin ol.",
-                    ephemeral=True
-                )
-            except Exception as e:
-                await interaction.response.send_message(
-                    f"❌ **Bir hata oluştu:** {e}",
-                    ephemeral=True
-                )
+                await interaction.response.send_message(f"✅ **Başarıyla `{role.name}` rolü çıkarıldı!**", ephemeral=True)
+            except:
+                await interaction.response.send_message("❌ **Botun yetkisi yok!**", ephemeral=True)
+            return
+        
+        # --- /eslebuton BUTONU ---
+        elif interaction.data.get("custom_id") == "hesap_esle":
+            await interaction.response.send_modal(KodModal())
+            return
 
 # ============================================
 # PREFIX KOMUTLAR
 # ============================================
-GIZLI_IP = "104.239.83.40"
-SERVER_DOMAIN = "oyna.tccraft.com.tr"
-
-SERVERS = {
-    "Lobi": 25566,
-    "Towny": 25567,
-    "SMP": 25568,
-    "SkyBlock": 25569,
-    "BoxPVP": 25570,
-    "TrapPVP": 25571
-}
-
-@bot.event
-async def on_ready():
-    print(f'✅ {bot.user} olarak giriş yapıldı!')
-    await bot.change_presence(activity=discord.Game(name="tc!yardım"))
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ {len(synced)} slash komut senkronize edildi!")
-    except Exception as e:
-        print(f"❌ Slash komut senkronizasyon hatası: {e}")
-
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-    prefixes = ['tc!', 'TC!', 'Tc!', 'tC!']
-    for prefix in prefixes:
-        if message.content.startswith(prefix):
-            await bot.process_commands(message)
-            return
-    await bot.process_commands(message)
 
 # ---------- tc!sunucu ----------
 @bot.command(name='sunucu')
@@ -257,6 +302,7 @@ async def yardim(ctx):
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
     embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar! **(Sadece Yetkililer)**", inline=False)
+    embed.add_field(name="📌 `/eslebuton`", value="Hesap eşleştirme butonu oluştur! **(Sadece Yetkililer)**", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.author.send(embed=embed)
@@ -304,7 +350,7 @@ async def oyuncular(ctx):
         except:
             embed.add_field(
                 name=f"🔴 {server_name}",
-                value="*Sunucu kapalı veya ulaşılamıyor*",
+                value="*Kapalı*",
                 inline=False
             )
     
