@@ -166,9 +166,9 @@ async def rolverme(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 # ============================================
-# PREFIX KOMUT: !ip (YENİ)
+# PREFIX KOMUT: !ip (DÜZELTİLDİ - aliases kaldırıldı)
 # ============================================
-@bot.command(name='ip', aliases=['IP'])
+@bot.command(name='ip')  # aliases=['IP'] KALDIRILDI!
 async def ip_command(ctx):
     embed = discord.Embed(
         title="🌐 Sunucu IP'si",
