@@ -6,9 +6,6 @@ import mcstatus
 from flask import Flask
 from threading import Thread
 import datetime
-import asyncio
-import random
-import aiohttp
 
 # === TOKEN ===
 BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
@@ -35,7 +32,7 @@ def keep_alive():
 # === DISCORD BOT ===
 intents = discord.Intents.all()
 bot = commands.Bot(
-    command_prefix=['tc!', '!'],  # tc! ve ! prefix'leri
+    command_prefix=['tc!', '!'],
     intents=intents,
     help_command=None,
     case_insensitive=True
@@ -56,10 +53,7 @@ SERVERS = {
     "TrapPVP": 25571
 }
 
-# ============================================
-# ROL ID (Hesap eşleştirme kapalı ama kalsın)
-# ============================================
-ROL_ID = 1527706174424612934  # Sunucu Kesintileri Rolü
+ROL_ID = 1527706174424612934
 
 # ============================================
 # OLAY (EVENT) - on_ready
@@ -89,13 +83,12 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # ============================================
-# MODAL - KOD GİRME KUTUSU (Şu an kullanılmıyor ama kalsın)
+# MODAL - KOD GİRME KUTUSU (Kullanılmıyor)
 # ============================================
 class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
     def __init__(self, sunucu_adi):
         super().__init__()
         self.sunucu_adi = sunucu_adi
-        
         self.kod = discord.ui.TextInput(
             label=f"Minecraft {sunucu_adi} - Aldığın Kod",
             placeholder="Örnek: 123456",
@@ -106,19 +99,13 @@ class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
         self.add_item(self.kod)
     
     async def on_submit(self, interaction: discord.Interaction):
-        kod = self.kod.value
-        sunucu = self.sunucu_adi
-        
         await interaction.response.send_message(
-            f"✅ **Kod alındı!**\n"
-            f"Sunucu: `{sunucu}`\n"
-            f"Kod: `{kod}`\n\n"
-            f"⏳ Minecraft sunucusu ile doğrulanıyor...",
+            f"✅ **Kod alındı!**\nSunucu: `{self.sunucu_adi}`\nKod: `{self.kod.value}`",
             ephemeral=True
         )
 
 # ============================================
-# SLASH KOMUT: /rolverme (Sadece Yetkililer, EPHEMERAL DEĞİL)
+# SLASH KOMUT: /rolverme (DM değil, kanalda gözükür)
 # ============================================
 @bot.tree.command(
     name="rolverme",
@@ -127,26 +114,12 @@ class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
 @app_commands.default_permissions(administrator=True)
 async def rolverme(interaction: discord.Interaction):
     role = interaction.guild.get_role(ROL_ID)
-    
     if role is None:
-        await interaction.response.send_message(
-            "❌ **Rol bulunamadı!** Lütfen bot sahibine bildirin.",
-            ephemeral=True
-        )
+        await interaction.response.send_message("❌ **Rol bulunamadı!**", ephemeral=True)
         return
     
-    al_button = discord.ui.Button(
-        label="✅ Rol Al",
-        style=discord.ButtonStyle.green,
-        custom_id="rol_al"
-    )
-    
-    cikar_button = discord.ui.Button(
-        label="❌ Rolü Çıkar",
-        style=discord.ButtonStyle.red,
-        custom_id="rol_cikar"
-    )
-    
+    al_button = discord.ui.Button(label="✅ Rol Al", style=discord.ButtonStyle.green, custom_id="rol_al")
+    cikar_button = discord.ui.Button(label="❌ Rolü Çıkar", style=discord.ButtonStyle.red, custom_id="rol_cikar")
     view = discord.ui.View()
     view.add_item(al_button)
     view.add_item(cikar_button)
@@ -163,11 +136,10 @@ async def rolverme(interaction: discord.Interaction):
     )
     embed.set_footer(text="TCCRAFT • Her zaman bilgilen!")
     
-    # EPHEMERAL DEĞİL - herkes görebilir
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 # ============================================
-# PREFIX KOMUT: !ip (EPHEMERAL)
+# PREFIX KOMUT: !ip (DM)
 # ============================================
 @bot.command(name='ip')
 async def ip_command(ctx):
@@ -176,11 +148,12 @@ async def ip_command(ctx):
         description="**oyna.tccraft.com.tr**",
         color=discord.Color.blue()
     )
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("✅ IP adresi DM olarak gönderildi!", delete_after=3)
 
 # ============================================
-# PREFIX KOMUT: tc!sunucu (EPHEMERAL)
+# PREFIX KOMUT: tc!sunucu (DM)
 # ============================================
 @bot.command(name='sunucu')
 async def sunucu_durumu(ctx):
@@ -200,20 +173,12 @@ async def sunucu_durumu(ctx):
         try:
             server = mcstatus.JavaServer(f"{GIZLI_IP}:{port}", timeout=5)
             status = server.status()
-            
             online_count += 1
             total_players += status.players.online
-            
-            if status.players.online > 0:
-                status_emoji = "🟢"
-            else:
-                status_emoji = "🟡"
-            
+            status_emoji = "🟢" if status.players.online > 0 else "🟡"
             embed.add_field(
                 name=f"{status_emoji} {server_name}",
-                value=f"👥 `{status.players.online}` / {status.players.max}\n"
-                      f"📌 `{status.version.name}`\n"
-                      f"🔄 `{status.latency*1000:.0f}ms`",
+                value=f"👥 `{status.players.online}` / {status.players.max}\n📌 `{status.version.name}`\n🔄 `{status.latency*1000:.0f}ms`",
                 inline=True
             )
         except:
@@ -223,21 +188,20 @@ async def sunucu_durumu(ctx):
                 inline=True
             )
     
-    embed.set_footer(
-        text=f"✅ {online_count}/{len(SERVERS)} aktif • {total_players} oyuncu • !yardım"
-    )
+    embed.set_footer(text=f"✅ {online_count}/{len(SERVERS)} aktif • {total_players} oyuncu • !yardım")
     
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("✅ Sunucu bilgileri DM olarak gönderildi!", delete_after=3)
 
 # ============================================
-# PREFIX KOMUT: tc!yardım / !yardım (EPHEMERAL)
+# PREFIX KOMUT: tc!yardım / !yardım (DM)
 # ============================================
 @bot.command(name='yardım', aliases=['yardim', 'help'])
 async def yardim(ctx):
     embed = discord.Embed(
         title="📚 TCCRAFT Bot Komutları",
-        description="Tüm komutlar **ephemeral (geçici)** olarak gönderilir!",
+        description="Tüm komutlar **DM** olarak gönderilir!",
         color=discord.Color.blue()
     )
     embed.add_field(name="🌐 `!ip` / `tc!ip`", value="Sunucu IP'sini gösterir.", inline=False)
@@ -247,14 +211,15 @@ async def yardim(ctx):
     embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
-    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar! **(Sadece Yetkililer)**", inline=False)  # DÜZELTİLDİ
+    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar! **(Sadece Yetkililer)**", inline=False)
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("📨 Yardım menüsü DM olarak gönderildi!", delete_after=3)
 
 # ============================================
-# PREFIX KOMUT: tc!oyuncular (EPHEMERAL)
+# PREFIX KOMUT: tc!oyuncular (DM)
 # ============================================
 @bot.command(name='oyuncular')
 async def oyuncular(ctx):
@@ -274,7 +239,6 @@ async def oyuncular(ctx):
             server = mcstatus.JavaServer(f"{GIZLI_IP}:{port}", timeout=5)
             query = server.query()
             players = query.players.names if query.players.names else []
-            
             if players:
                 has_players = True
                 total_players += len(players)
@@ -301,14 +265,14 @@ async def oyuncular(ctx):
     
     if not has_players:
         embed.description = "📭 **Hiçbir sunucuda oyuncu yok!**"
-    
     embed.set_footer(text=f"Toplam {total_players} oyuncu çevrimiçi")
     
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("✅ Oyuncu listesi DM olarak gönderildi!", delete_after=3)
 
 # ============================================
-# PREFIX KOMUT: tc!ping (EPHEMERAL)
+# PREFIX KOMUT: tc!ping (DM)
 # ============================================
 @bot.command(name='ping')
 async def ping(ctx):
@@ -318,11 +282,12 @@ async def ping(ctx):
         description=f"Gecikme: **{latency} ms**",
         color=discord.Color.green() if latency < 100 else discord.Color.yellow() if latency < 300 else discord.Color.red()
     )
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("🏓 Ping sonucu DM olarak gönderildi!", delete_after=3)
 
 # ============================================
-# PREFIX KOMUT: tc!istatistik (EPHEMERAL)
+# PREFIX KOMUT: tc!istatistik (DM)
 # ============================================
 @bot.command(name='istatistik')
 async def istatistik(ctx):
@@ -337,11 +302,12 @@ async def istatistik(ctx):
     embed.add_field(name="⏰ Çalışma Süresi", value="Bot aktif ✅", inline=True)
     embed.add_field(name="🔗 Bağlantı", value=f"[{SERVER_DOMAIN}](https://{SERVER_DOMAIN})", inline=True)
     
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("📊 Bot istatistikleri DM olarak gönderildi!", delete_after=3)
 
 # ============================================
-# PREFIX KOMUT: tc!zaman (EPHEMERAL)
+# PREFIX KOMUT: tc!zaman (DM)
 # ============================================
 @bot.command(name='zaman')
 async def zaman(ctx):
@@ -354,11 +320,12 @@ async def zaman(ctx):
     embed.add_field(name="🕐 Saat", value=now.strftime("%H:%M:%S"), inline=True)
     embed.add_field(name="🌍 Zaman Dilimi", value="UTC+3 (Türkiye)", inline=True)
     
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("⏰ Zaman bilgisi DM olarak gönderildi!", delete_after=3)
 
 # ============================================
-# PREFIX KOMUT: tc!botbilgi (EPHEMERAL)
+# PREFIX KOMUT: tc!botbilgi (DM)
 # ============================================
 @bot.command(name='botbilgi')
 async def botbilgi(ctx):
@@ -376,8 +343,9 @@ async def botbilgi(ctx):
     embed.add_field(name="🔗 Bağlantı", value=f"[{SERVER_DOMAIN}](https://{SERVER_DOMAIN})", inline=False)
     embed.set_footer(text="TCCRAFT • !yardım ile tüm komutları gör")
     
-    await ctx.send(embed=embed, ephemeral=True)
+    await ctx.author.send(embed=embed)
     await ctx.message.delete()
+    await ctx.send("🤖 Bot bilgileri DM olarak gönderildi!", delete_after=3)
 
 # ============================================
 # BUTON ETKİLEŞİMLERİ (rolverme için)
@@ -386,10 +354,9 @@ async def botbilgi(ctx):
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
         custom_id = interaction.data.get("custom_id")
+        role = interaction.guild.get_role(ROL_ID)
         
-        # --- /rolverme BUTONLARI ---
         if custom_id == "rol_al":
-            role = interaction.guild.get_role(ROL_ID)
             if role is None:
                 await interaction.response.send_message("❌ **Rol bulunamadı!**", ephemeral=True)
                 return
@@ -404,7 +371,6 @@ async def on_interaction(interaction: discord.Interaction):
             return
         
         elif custom_id == "rol_cikar":
-            role = interaction.guild.get_role(ROL_ID)
             if role is None:
                 await interaction.response.send_message("❌ **Rol bulunamadı!**", ephemeral=True)
                 return
