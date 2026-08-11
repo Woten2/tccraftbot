@@ -118,7 +118,7 @@ class KodModal(discord.ui.Modal, title="🔗 Hesap Eşleştirme Kodu"):
         )
 
 # ============================================
-# SLASH KOMUT: /rolverme (Sadece Yetkililer)
+# SLASH KOMUT: /rolverme (Sadece Yetkililer, EPHEMERAL DEĞİL)
 # ============================================
 @bot.tree.command(
     name="rolverme",
@@ -163,12 +163,13 @@ async def rolverme(interaction: discord.Interaction):
     )
     embed.set_footer(text="TCCRAFT • Her zaman bilgilen!")
     
+    # EPHEMERAL DEĞİL - herkes görebilir
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 # ============================================
-# PREFIX KOMUT: !ip (DÜZELTİLDİ - aliases kaldırıldı)
+# PREFIX KOMUT: !ip (EPHEMERAL)
 # ============================================
-@bot.command(name='ip')  # aliases=['IP'] KALDIRILDI!
+@bot.command(name='ip')
 async def ip_command(ctx):
     embed = discord.Embed(
         title="🌐 Sunucu IP'si",
@@ -246,7 +247,7 @@ async def yardim(ctx):
     embed.add_field(name="📊 `tc!istatistik`", value="Bot istatistiklerini gösterir.", inline=False)
     embed.add_field(name="⏰ `tc!zaman`", value="Zaman dilimini gösterir.", inline=False)
     embed.add_field(name="🤖 `tc!botbilgi`", value="Bot hakkında detaylı bilgi verir.", inline=False)
-    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar! **(Sadece Yetkililer)**", inline=False)
+    embed.add_field(name="📌 `/rolverme`", value="Sunucu kesintilerinden haberdar olmak için rol al veya çıkar! **(Sadece Yetkililer)**", inline=False)  # DÜZELTİLDİ
     embed.set_footer(text="TCCRAFT • Her zaman oyunda! 🎯")
     
     await ctx.send(embed=embed, ephemeral=True)
